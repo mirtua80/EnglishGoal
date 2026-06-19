@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goal English ⚽ — Atlètic Sant Just</title>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+  GOAL ENGLISH — Atlètic Sant Just Sub-13B
+  ───────────────────────────────────────────────────────────────────────────
+  CONFIGURACIÓ NECESSÀRIA (llegeix-ho abans d'obrir l'arxiu):
+
+  1) FIREBASE — ves a https://console.firebase.google.com
+     a) Crea un projecte nou (ex: "goal-english-santjust")
+     b) Authentication → Habilita "Anònim" (anonymous)
+     c) Firestore Database → Crea base de dades en mode "producció"
+        Regles de Firestore → pega això i publica:
+        ┌─────────────────────────────────────────────────────┐
+        │ rules_version = '2';                                │
+        │ service cloud.firestore {                           │
+        │   match /databases/{db}/documents {                 │
+        │     match /progress/{uid} {                         │
+        │       allow read, write: if request.auth.uid == uid;│
+        │     }                                               │
+        │   }                                                 │
+        │ }                                                   │
+        └─────────────────────────────────────────────────────┘
+     d) Configuració del projecte → "Afegir app web" → copia les claus
+        i substitueix les de la secció FIREBASE CONFIG aquí baix
+
+  2) API KEY DE CLAUDE — ves a https://console.anthropic.com
+     Crea una API key i posa-la a la secció CLAUDE CONFIG aquí baix
+
+  3) GITHUB PAGES — puja aquest arxiu a un repo i activa Pages
+     (Settings → Pages → Source: main branch, / root)
+     La URL serà: https://[el-teu-usuari].github.io/[nom-repo]/goal-english.html
+════════════════════════════════════════════════════════════════════════════ -->
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a1f0a; --card: #122012; --cardh: #1a2e1a;
+  --border: #1e3a1e; --borderb: #2d5a2d;
+  --yellow: #f5c518; --yellowd: #c49a00;
+  --green: #22c55e; --red: #ef4444; --blue: #60a5fa;
+  --white: #f1f5f1; --gray: #6b8f6b; --grayl: #9ab89a;
+  --red-team: #d62828;
+}
+body {
+  background: radial-gradient(ellipse at 50% 0%, #1a3a1a 0%, var(--bg) 55%);
+  color: var(--white); font-family: 'Segoe UI', Arial, sans-serif;
+  min-height: 100vh;
+}
+#app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+/* ── Animacions ─────────────────────────────────────── */
+@keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-18px); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── Celebration overlay ────────────────────────────── */
+#goal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.92); z-index: 200;
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#goal-overlay.show { display: flex; }
+#goal-ball { font-size: 90px; animation: bounce 0.4s ease infinite alternate; }
+#goal-text { font-family: Impact, 'Arial Black', sans-serif; font-size: 68px; color: var(--yellow); letter-spacing: 6px; text-shadow: 0 0 40px #f5c518bb; margin-top: 10px; }
+#goal-sub { color: var(--white); font-size: 20px; margin-top: 10px; }
+
+/* ── Header ─────────────────────────────────────────── */
+#header {
+  background: linear-gradient(180deg, #0d1f0d, var(--bg));
+  padding: 16px 16px 12px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+#header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+#logo-icon { background: var(--red-team); border-radius: 10px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+#logo-text { font-family: Impact, sans-serif; font-size: 18px; letter-spacing: 2px; color: var(--yellow); }
+#logo-sub { font-size: 10px; color: var(--gray); letter-spacing: 1px; }
+#header-stats { display: flex; gap: 14px; }
+.hstat { text-align: center; }
+.hstat-val { font-size: 16px; font-weight: 900; }
+.hstat-lbl { font-size: 9px; color: var(--gray); }
+.save-indicator { font-size: 10px; color: var(--gray); text-align: right; margin-top: 4px; height: 14px; }
+
+/* ── XP Bar ─────────────────────────────────────────── */
+#xpbar { display: flex; align-items: center; gap: 8px; }
+#xp-level { background: var(--yellow); color: #000; border-radius: 20px; padding: 2px 10px; font-weight: 900; font-size: 12px; font-family: Impact, sans-serif; letter-spacing: 1px; white-space: nowrap; }
+#xp-track { flex: 1; background: var(--border); border-radius: 6px; height: 8px; }
+#xp-fill { height: 100%; background: linear-gradient(90deg, var(--yellow), var(--yellowd)); border-radius: 6px; transition: width 0.6s ease; }
+#xp-label { color: var(--gray); font-size: 11px; white-space: nowrap; }
+
+/* ── Nav ────────────────────────────────────────────── */
+#nav { display: flex; background: var(--bg); border-bottom: 1px solid var(--border); }
+.nav-btn { flex: 1; padding: 11px 4px; background: none; border: none; border-bottom: 3px solid transparent; color: var(--gray); font-weight: 700; font-size: 12px; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.nav-btn.active { color: var(--yellow); border-bottom-color: var(--yellow); }
+
+/* ── Screens ────────────────────────────────────────── */
+.screen { display: none; padding: 18px 16px 40px; animation: slideUp 0.25s ease; }
+.screen.active { display: block; }
+
+/* ── Topic grid ─────────────────────────────────────── */
+#topic-title { color: var(--yellow); font-family: Impact, sans-serif; font-size: 26px; letter-spacing: 3px; text-align: center; margin-bottom: 4px; }
+#topic-sub { color: var(--gray); text-align: center; font-size: 13px; margin-bottom: 20px; }
+#topic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.topic-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 12px; cursor: pointer; text-align: left; transition: all 0.2s; width: 100%; font-family: inherit; }
+.topic-card:hover { border-color: var(--yellow); background: var(--cardh); transform: translateY(-2px); }
+.topic-emoji { font-size: 28px; margin-bottom: 4px; }
+.topic-name { color: var(--white); font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.topic-desc { color: var(--gray); font-size: 11px; }
+
+/* ── Training screen ────────────────────────────────── */
+#training-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+#active-topic { display: flex; align-items: center; gap: 8px; }
+#active-topic-name { color: var(--white); font-weight: 700; font-size: 14px; }
+#btn-change { background: var(--border); border: none; color: var(--gray); border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 12px; font-family: inherit; }
+#loading { text-align: center; padding: 50px 0; }
+#loading-ball { font-size: 44px; animation: spin 1s linear infinite; display: inline-block; }
+#loading-text { color: var(--gray); margin-top: 14px; }
+#skip-btn { text-align: center; margin-top: 14px; }
+#skip-btn button { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 12px; font-family: inherit; }
+
+/* ── Exercise card ──────────────────────────────────── */
+#exercise-card { background: var(--card); border-radius: 18px; padding: 20px; border: 1px solid var(--border); transition: border 0.3s; }
+#exercise-card.correct { border: 2px solid var(--green); }
+#exercise-card.wrong { border: 2px solid var(--red); }
+#ex-context { background: var(--border); border-radius: 8px; padding: 5px 10px; font-size: 12px; color: var(--yellow); margin-bottom: 14px; display: inline-block; }
+#ex-question { color: var(--white); font-size: 17px; font-weight: 600; line-height: 1.5; margin-bottom: 18px; }
+.options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.opt-btn { padding: 11px 8px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; border: none; transition: all 0.2s; background: var(--border); color: var(--white); font-family: inherit; }
+.opt-btn:hover:not(:disabled) { background: var(--borderb); transform: scale(1.03); }
+.opt-btn.selected { background: var(--yellow); color: #000; transform: scale(1.04); }
+.opt-btn.correct-ans { background: var(--green); color: #fff; }
+.opt-btn.wrong-ans { background: var(--red); color: #fff; }
+.opt-btn.neutral-after { background: var(--border); color: var(--gray); }
+#translate-area { width: 100%; background: var(--border); border: 1px solid var(--borderb); border-radius: 10px; padding: 12px; color: var(--white); font-size: 15px; resize: none; height: 76px; outline: none; font-family: inherit; }
+#translate-area:focus { border-color: var(--yellow); }
+#reorder-drop { min-height: 48px; background: var(--border); border-radius: 10px; padding: 8px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; border: 1px dashed var(--borderb); }
+#reorder-drop-hint { color: var(--gray); font-size: 13px; align-self: center; }
+#reorder-bank { display: flex; flex-wrap: wrap; gap: 6px; }
+.word-chip { padding: 5px 10px; border-radius: 7px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; font-family: inherit; transition: all 0.15s; }
+.word-placed { background: var(--yellow); color: #000; }
+.word-placed:hover { opacity: 0.85; }
+.word-avail { background: var(--cardh); color: var(--white); border: 1px solid var(--borderb); }
+.word-avail:hover { background: var(--borderb); }
+#hint-toggle { background: none; border: none; color: var(--gray); cursor: pointer; font-size: 12px; margin-top: 12px; display: flex; align-items: center; gap: 5px; font-family: inherit; }
+#hint-box { background: rgba(245,197,24,0.08); border: 1px solid rgba(196,154,0,0.3); border-radius: 8px; padding: 8px 10px; margin-top: 6px; color: var(--yellow); font-size: 12px; display: none; }
+#hint-box.show { display: block; }
+#feedback { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-weight: 700; font-size: 13px; display: none; }
+#feedback.correct { display: block; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: var(--green); }
+#feedback.wrong { display: block; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: var(--red); }
+#submit-btn { width: 100%; margin-top: 16px; padding: 13px; background: linear-gradient(135deg, var(--yellow), var(--yellowd)); color: #000; border: none; border-radius: 12px; font-weight: 900; font-size: 16px; cursor: pointer; font-family: Impact, sans-serif; letter-spacing: 2px; box-shadow: 0 4px 18px rgba(245,197,24,0.25); transition: all 0.2s; }
+#submit-btn:disabled { background: var(--border); color: var(--gray); cursor: not-allowed; box-shadow: none; }
+
+/* ── League screen ──────────────────────────────────── */
+.section-title { color: var(--yellow); font-family: Impact, sans-serif; font-size: 22px; letter-spacing: 3px; text-align: center; margin-bottom: 4px; }
+.section-sub { color: var(--gray); font-size: 12px; text-align: center; margin-bottom: 16px; }
+#sant-just-summary { background: linear-gradient(135deg, #3a0a0a, #2a1010); border: 2px solid var(--red-team); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+#sjs-title { font-weight: 800; color: var(--red-team); font-size: 15px; margin-bottom: 8px; }
+.sjs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.sjs-item { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 4px; }
+.sjs-val { color: var(--white); font-weight: 700; font-size: 14px; }
+.sjs-lbl { color: var(--gray); font-size: 11px; }
+#league-table { background: var(--card); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 14px; }
+.table-header { background: var(--border); padding: 8px 12px; display: grid; grid-template-columns: 24px 1fr 36px 36px; gap: 6px; font-size: 11px; color: var(--gray); font-weight: 700; }
+.table-row { padding: 10px 12px; display: grid; grid-template-columns: 24px 1fr 36px 36px; gap: 6px; align-items: center; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
+.table-row.my-team { background: rgba(214,40,40,0.1); border-left-color: var(--red-team); }
+.table-row.my-team .row-name { color: var(--white); font-weight: 800; }
+.table-row.my-team .row-pts { color: var(--yellow); }
+.row-pos { font-weight: 700; font-size: 13px; }
+.row-pos.top { color: var(--green); }
+.row-pos.me { color: var(--red-team); }
+.row-name { color: var(--grayl); font-size: 12px; }
+.row-pts { font-weight: 700; font-size: 13px; text-align: center; }
+.row-w { color: var(--gray); font-size: 12px; text-align: center; }
+.table-more { padding: 8px 12px; color: var(--gray); font-size: 11px; text-align: center; }
+.results-title { color: var(--yellow); font-weight: 700; font-size: 13px; margin-bottom: 8px; }
+.result-row { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; border: 1px solid var(--border); }
+.result-badge { border-radius: 6px; padding: 2px 8px; font-weight: 800; font-size: 12px; min-width: 28px; text-align: center; color: #fff; }
+.result-badge.W { background: var(--green); }
+.result-badge.D { background: var(--blue); }
+.result-badge.L { background: var(--red); }
+.result-info { flex: 1; }
+.result-teams { color: var(--white); font-size: 12px; }
+.result-score { color: var(--yellow); font-weight: 800; }
+.result-detail { color: var(--gray); font-size: 11px; }
+
+/* ── Stats screen ───────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(--card); border-radius: 14px; padding: 16px; text-align: center; border: 1px solid var(--border); }
+.stat-val { font-size: 22px; font-weight: 900; font-family: Impact, sans-serif; }
+.stat-lbl { font-size: 11px; color: var(--gray); margin-top: 4px; }
+.season-card { background: linear-gradient(135deg, #3a0a0a, #1a0808); border: 1px solid var(--red-team); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+.season-title { color: var(--red-team); font-weight: 800; margin-bottom: 6px; font-size: 14px; }
+.season-text { color: var(--grayl); font-size: 13px; line-height: 1.6; }
+.xp-card { background: var(--card); border-radius: 14px; padding: 16px; border: 1px solid var(--border); margin-bottom: 16px; }
+.xp-card-title { font-weight: 700; color: var(--yellow); margin-bottom: 8px; font-size: 13px; }
+.xp-note { color: var(--gray); font-size: 12px; margin-top: 10px; }
+#btn-back-training { width: 100%; padding: 13px; background: linear-gradient(135deg, var(--yellow), var(--yellowd)); color: #000; border: none; border-radius: 12px; font-weight: 900; font-size: 15px; cursor: pointer; font-family: Impact, sans-serif; letter-spacing: 2px; }
+
+/* ── Firebase status banner ─────────────────────────── */
+#fb-banner { font-size: 11px; text-align: center; padding: 4px; }
+#fb-banner.ok { color: var(--green); }
+#fb-banner.err { color: var(--red); }
+#fb-banner.loading { color: var(--gray); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ GOAL OVERLAY ═══════════════════ -->
+<div id="goal-overlay">
+  <div id="goal-ball">⚽</div>
+  <div id="goal-text">GOAL!</div>
+  <div id="goal-sub">+20 XP · Segueix així! 🔥</div>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════════════ -->
+<div id="app">
+
+  <!-- Header -->
+  <div id="header">
+    <div id="header-top">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div id="logo-icon">⚽</div>
+        <div>
+          <div id="logo-text">GOAL ENGLISH</div>
+          <div id="logo-sub">ATLÈTIC SANT JUST · SUB-13B</div>
+        </div>
+      </div>
+      <div id="header-stats">
+        <div class="hstat">
+          <div class="hstat-val" id="h-goals" style="color:var(--yellow)">0</div>
+          <div class="hstat-lbl">GOALS</div>
+        </div>
+        <div class="hstat">
+          <div class="hstat-val" id="h-streak" style="color:var(--white)">0</div>
+          <div class="hstat-lbl">STREAK</div>
+        </div>
+      </div>
+    </div>
+    <div id="xpbar">
+      <div id="xp-level">LVL 1</div>
+      <div id="xp-track"><div id="xp-fill" style="width:0%"></div></div>
+      <div id="xp-label">0/100</div>
+    </div>
+    <div class="save-indicator" id="save-indicator"></div>
+  </div>
+  <div id="fb-banner" class="loading">Connectant a Firebase...</div>
+
+  <!-- Nav -->
+  <div id="nav">
+    <button class="nav-btn active" onclick="showScreen('home')">🏋️ Training</button>
+    <button class="nav-btn" onclick="showScreen('league')">🏆 My League</button>
+    <button class="nav-btn" onclick="showScreen('stats')">📊 Stats</button>
+  </div>
+
+  <!-- ── HOME screen ── -->
+  <div id="screen-home" class="screen active">
+    <div id="topic-title">CHOOSE TRAINING</div>
+    <div id="topic-sub">Tot sobre el Sant Just — en anglès! 🔴</div>
+    <div id="topic-grid">
+      <button class="topic-card" onclick="selectTopic('my team stats and season','📊','My Season')">
+        <div class="topic-emoji">📊</div>
+        <div class="topic-name">My Season</div>
+        <div class="topic-desc">Sant Just stats & results</div>
+      </button>
+      <button class="topic-card" onclick="selectTopic('match report after a 9-8 thriller win','🔥','Epic Match')">
+        <div class="topic-emoji">🔥</div>
+        <div class="topic-name">Epic Match</div>
+        <div class="topic-desc">Sant Just 9-8 Igualada!</div>
+      </button>
+      <button class="topic-card" onclick="selectTopic('pre-match interview before facing rivals Cornellà or Marc Bartra','🎙️','Pre-Match')">
+        <div class="topic-emoji">🎙️</div>
+        <div class="topic-name">Pre-Match</div>
+        <div class="topic-desc">Talk like a real player</div>
+      </button>
+      <button class="topic-card" onclick="selectTopic('football positions and tactics for Sub-13 football','📋','Tactics')">
+        <div class="topic-emoji">📋</div>
+        <div class="topic-name">Tactics</div>
+        <div class="topic-desc">Formations & positions</div>
+      </button>
+      <button class="topic-card" onclick="selectTopic('moving up to Sub-13B next season at Atlètic Sant Just','🚀','Next Season')">
+        <div class="topic-emoji">🚀</div>
+        <div class="topic-name">Next Season</div>
+        <div class="topic-desc">Sub-13B promotion!</div>
+      </button>
+      <button class="topic-card" onclick="selectTopic('referee decisions and football rules','🟨','The Rules')">
+        <div class="topic-emoji">🟨</div>
+        <div class="topic-name">The Rules</div>
+        <div class="topic-desc">Cards, fouls & offside</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── TRAINING screen ── -->
+  <div id="screen-training" class="screen">
+    <div id="training-header">
+      <div id="active-topic">
+        <span id="active-emoji" style="font-size:20px">⚽</span>
+        <span id="active-topic-name"></span>
+      </div>
+      <button id="btn-change" onclick="showScreen('home')">← Change</button>
+    </div>
+
+    <div id="loading" style="display:none">
+      <div id="loading-ball">⚽</div>
+      <div id="loading-text">Preparing exercise...</div>
+    </div>
+
+    <div id="exercise-card" style="display:none">
+      <div id="ex-context"></div>
+      <div id="ex-question"></div>
+
+      <!-- Fill options -->
+      <div id="ex-fill" class="options-grid" style="display:none"></div>
+
+      <!-- Translate -->
+      <textarea id="ex-translate" style="display:none" placeholder="Write your answer in English..."></textarea>
+
+      <!-- Reorder -->
+      <div id="ex-reorder" style="display:none">
+        <div id="reorder-drop">
+          <span id="reorder-drop-hint">Tap words to build the sentence...</span>
+        </div>
+        <div id="reorder-bank"></div>
+      </div>
+
+      <button id="hint-toggle" onclick="toggleHint()">💡 Veure pista</button>
+      <div id="hint-box"></div>
+      <div id="feedback"></div>
+      <button id="submit-btn" onclick="submitAnswer()" disabled>SHOOT! ⚽</button>
+    </div>
+
+    <div id="skip-btn" style="display:none">
+      <button onclick="loadExercise()">↩ Skip this exercise</button>
+    </div>
+  </div>
+
+  <!-- ── LEAGUE screen ── -->
+  <div id="screen-league" class="screen">
+    <div class="section-title">PRIMERA DIVISIÓ ALEVÍ</div>
+    <div class="section-sub">Grup 9 · Temporada 2025/26 · Jornada 30</div>
+
+    <div id="sant-just-summary">
+      <div id="sjs-title">🔴 Atlètic Sant Just B — La teva temporada</div>
+      <div class="sjs-grid">
+        <div class="sjs-item"><div class="sjs-val">5è 🏅</div><div class="sjs-lbl">Position</div></div>
+        <div class="sjs-item"><div class="sjs-val">57 pts</div><div class="sjs-lbl">Points</div></div>
+        <div class="sjs-item"><div class="sjs-val">18 ✅</div><div class="sjs-lbl">Wins</div></div>
+        <div class="sjs-item"><div class="sjs-val">111 ⚽</div><div class="sjs-lbl">Goals</div></div>
+        <div class="sjs-item"><div class="sjs-val">3 ➖</div><div class="sjs-lbl">Draws</div></div>
+        <div class="sjs-item"><div class="sjs-val">9 ❌</div><div class="sjs-lbl">Losses</div></div>
+      </div>
+    </div>
+
+    <div id="league-table">
+      <div class="table-header"><span>#</span><span>Team</span><span style="text-align:center">Pts</span><span style="text-align:center">W</span></div>
+      <!-- Rows injected by JS -->
+    </div>
+
+    <div class="results-title">🕐 Recent Results</div>
+    <!-- Results injected by JS -->
+    <div id="results-list"></div>
+  </div>
+
+  <!-- ── STATS screen ── -->
+  <div id="screen-stats" class="screen">
+    <div style="color:var(--yellow);font-family:Impact,sans-serif;font-size:26px;letter-spacing:3px;text-align:center;margin-bottom:18px">YOUR STATS</div>
+
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" id="st-level" style="color:var(--yellow)">⭐ 1</div><div class="stat-lbl">Level</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-xp" style="color:var(--blue)">✨ 0</div><div class="stat-lbl">Total XP</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-goals" style="color:var(--green)">⚽ 0</div><div class="stat-lbl">Goals</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-acc" style="color:var(--yellow)">🎯 0%</div><div class="stat-lbl">Accuracy</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-streak" style="color:var(--red)">🔥 0</div><div class="stat-lbl">Best Streak</div></div>
+      <div class="stat-card"><div class="stat-val" id="st-total" style="color:var(--gray)">📝 0</div><div class="stat-lbl">Exercises</div></div>
+    </div>
+
+    <div class="season-card">
+      <div class="season-title">🔴 El teu equip aquesta temporada</div>
+      <div class="season-text">
+        Atlètic Sant Just B va acabar <strong style="color:var(--white)">5è</strong> amb <strong style="color:var(--yellow)">57 punts</strong>, <strong style="color:var(--white)">18 victòries</strong> i <strong style="color:var(--white)">111 gols</strong> marcats. L'any que ve: <strong style="color:var(--green)">Sub-13B!</strong> 🚀
+      </div>
+    </div>
+
+    <div class="xp-card">
+      <div class="xp-card-title">🏆 XP Progress</div>
+      <div id="xpbar2" style="display:flex;align-items:center;gap:8px">
+        <div id="xp-level2" style="background:var(--yellow);color:#000;border-radius:20px;padding:2px 10px;font-weight:900;font-size:12px;font-family:Impact,sans-serif;white-space:nowrap">LVL 1</div>
+        <div style="flex:1;background:var(--border);border-radius:6px;height:8px"><div id="xp-fill2" style="width:0%;height:100%;background:linear-gradient(90deg,var(--yellow),var(--yellowd));border-radius:6px;transition:width 0.6s"></div></div>
+        <div id="xp-label2" style="color:var(--gray);font-size:11px;white-space:nowrap">0/100</div>
+      </div>
+      <div class="xp-note">Keep training your English for next season! 🚀</div>
+    </div>
+
+    <button id="btn-back-training" onclick="showScreen('home')">BACK TO TRAINING ⚽</button>
+  </div>
+
+</div><!-- /#app -->
+
+<!-- ═══════════════════ FIREBASE SDK ═══════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ═══════════════════════════════════════════════════════
+//  ⚠️  FIREBASE CONFIG — substitueix amb les teves claus
+// ═══════════════════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "POSA-AQUI-LA-TEVA-API-KEY",
+  authDomain:        "POSA-AQUI.firebaseapp.com",
+  projectId:         "POSA-AQUI-EL-PROJECT-ID",
+  storageBucket:     "POSA-AQUI.appspot.com",
+  messagingSenderId: "POSA-AQUI-EL-SENDER-ID",
+  appId:             "POSA-AQUI-LA-APP-ID"
+};
+
+// ═══════════════════════════════════════════════════════
+//  ⚠️  CLAUDE API KEY — substitueix amb la teva clau
+//  (per producci, usa un proxy backend per no exposar-la)
+// ═══════════════════════════════════════════════════════
+window.CLAUDE_API_KEY = "POSA-AQUI-LA-CLAU-DE-CLAUDE";
+
+// ── Init Firebase ──────────────────────────────────────
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const banner = document.getElementById('fb-banner');
+let currentUid = null;
+
+// ── Auth anònim ────────────────────────────────────────
+signInAnonymously(auth).catch(err => {
+  banner.textContent = '⚠️ Firebase: ' + err.message;
+  banner.className = 'err';
+});
+
+onAuthStateChanged(auth, async user => {
+  if (user) {
+    currentUid = user.uid;
+    banner.textContent = '✅ Progrés guardat al núvol';
+    banner.className = 'ok';
+    setTimeout(() => banner.style.display = 'none', 3000);
+    await loadFromFirebase();
+  }
+});
+
+// ── Load progress ──────────────────────────────────────
+async function loadFromFirebase() {
+  try {
+    const ref = doc(db, 'progress', currentUid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      window.STATE.xp = data.xp || 0;
+      window.STATE.level = data.level || 1;
+      window.STATE.goals = data.goals || 0;
+      window.STATE.streak = data.streak || 0;
+      window.STATE.correct = data.correct || 0;
+      window.STATE.wrong = data.wrong || 0;
+      window.STATE.bestStreak = data.bestStreak || 0;
+      updateUI();
+      document.getElementById('save-indicator').textContent = '☁️ Progrés carregat';
+      setTimeout(() => document.getElementById('save-indicator').textContent = '', 2000);
+    }
+  } catch(e) {
+    console.warn('Firebase load error:', e);
+  }
+}
+
+// ── Save progress ──────────────────────────────────────
+window.saveToFirebase = async function() {
+  if (!currentUid) return;
+  try {
+    const ref = doc(db, 'progress', currentUid);
+    await setDoc(ref, {
+      ...window.STATE,
+      updatedAt: serverTimestamp()
+    });
+    document.getElementById('save-indicator').textContent = '✅ Guardat';
+    setTimeout(() => document.getElementById('save-indicator').textContent = '', 1500);
+  } catch(e) {
+    document.getElementById('save-indicator').textContent = '⚠️ Error guardant';
+    console.warn('Firebase save error:', e);
+  }
+};
+
+</script>
+
+<!-- ═══════════════════ APP LOGIC ═══════════════════════ -->
+<script>
+// ── State ──────────────────────────────────────────────
+window.STATE = {
+  xp: 0, level: 1, goals: 0, streak: 0,
+  correct: 0, wrong: 0, bestStreak: 0,
+};
+
+let currentTopic = null;
+let currentExercise = null;
+let lastType = null;
+let submitted = false;
+let orderedWords = [];
+let availableWords = [];
+let hintVisible = false;
+let useAI = true;
+let fallbackIdx = 0;
+
+// ── Data ───────────────────────────────────────────────
+const LEAGUE = [
+  { pos:1,  name:"UE Cornellà B",            pts:84, w:28, d:0, l:2,  me:false },
+  { pos:2,  name:"F. Vilanova i la Geltrú A", pts:66, w:21, d:3, l:6,  me:false },
+  { pos:3,  name:"Prat AE C",                 pts:61, w:18, d:7, l:5,  me:false },
+  { pos:4,  name:"Cornellà UE SAD A",         pts:61, w:19, d:4, l:7,  me:false },
+  { pos:5,  name:"⚽ Atlètic Sant Just B",     pts:57, w:18, d:3, l:9,  me:true  },
+  { pos:6,  name:"Marc Bartra 2020 A",        pts:55, w:17, d:4, l:9,  me:false },
+  { pos:7,  name:"Escola F. Gavà B",          pts:46, w:14, d:4, l:12, me:false },
+  { pos:8,  name:"Viladecans UD A",           pts:46, w:14, d:4, l:12, me:false },
+  { pos:9,  name:"Martorell CF B",            pts:40, w:12, d:4, l:14, me:false },
+  { pos:10, name:"Vinyets Molí-Vell A",       pts:39, w:12, d:3, l:15, me:false },
+];
+
+const RESULTS = [
+  { home:"Sant Just B", away:"Igualada CF A",       score:"9-8", r:"W", detail:"What a match! 17 goals!" },
+  { home:"Prat AE C",   away:"Sant Just B",         score:"1-1", r:"D", detail:"Away draw" },
+  { home:"Vinyets",     away:"Sant Just B",         score:"5-6", r:"W", detail:"Comeback win!" },
+  { home:"Sant Just B", away:"Atlètic Vilafranca A",score:"4-3", r:"W", detail:"Tight win at home" },
+  { home:"Sitges UE A", away:"Sant Just B",         score:"1-6", r:"W", detail:"Big away win!" },
+];
+
+const FALLBACK = [
+  { type:"fill", question:"Atlètic Sant Just B finished in ___ place in Primera Divisió Aleví S12, Grup 9.", options:["fifth","first","third","last"], answer:"fifth", hint:"5ª posición = fifth place", context:"⚽ Temporada 2025/26 — FCF Primera Divisió Aleví S12" },
+  { type:"translate", question:"Traduce: 'El Sant Just va marcar 111 gols aquesta temporada.'", answer:"Sant Just scored 111 goals this season.", hint:"scored = va marcar | goals = gols | this season = aquesta temporada", context:"⚽ Sant Just attack stats — 111 goals in 30 games!" },
+  { type:"reorder", question:"Ordena les paraules:", words:["won","Sant","Just","eighteen","games","this","season"], answer:"Sant Just won eighteen games this season", hint:"Subject + verb + object. eighteen = 18", context:"⚽ 18 victories for Sant Just this season!" },
+  { type:"fill", question:"The match against Igualada ended ___ goals to eight!", options:["nine","seven","ten","six"], answer:"nine", hint:"9-8 was the final score. nine = 9", context:"⚽ Sant Just 9 - 8 Igualada! Last matchday thriller!" },
+  { type:"translate", question:"Traduce: 'L'any que ve jugaré a la Sub-13B de l'Atlètic Sant Just.'", answer:"Next year I will play for Atlètic Sant Just Sub-13B.", hint:"l'any que ve = next year | jugaré = I will play", context:"⚽ New season coming up — Sub-13B here we go!" },
+  { type:"fill", question:"Fundació UE Cornellà B ___ the league with 84 points.", options:["won","lost","drew","missed"], answer:"won", hint:"guanyar = to win. They came first.", context:"⚽ Cornellà B were champions of Grup 9 this season." },
+];
+
+// ── Render static content ──────────────────────────────
+function renderLeague() {
+  const table = document.getElementById('league-table');
+  let html = '<div class="table-header"><span>#</span><span>Team</span><span style="text-align:center">Pts</span><span style="text-align:center">W</span></div>';
+  LEAGUE.forEach(t => {
+    const posClass = t.pos <= 2 ? 'top' : t.me ? 'me' : '';
+    html += `<div class="table-row${t.me?' my-team':''}">
+      <span class="row-pos ${posClass}">${t.pos}</span>
+      <span class="row-name">${t.name}</span>
+      <span class="row-pts">${t.pts}</span>
+      <span class="row-w">${t.w}</span>
+    </div>`;
+  });
+  html += '<div class="table-more">... 6 more teams below</div>';
+  table.innerHTML = html;
+
+  const rl = document.getElementById('results-list');
+  rl.innerHTML = RESULTS.map(r => `
+    <div class="result-row">
+      <span class="result-badge ${r.r}">${r.r}</span>
+      <div class="result-info">
+        <div class="result-teams">${r.home} <span class="result-score">${r.score}</span> ${r.away}</div>
+        <div class="result-detail">${r.detail}</div>
+      </div>
+    </div>`).join('');
+}
+renderLeague();
+
+// ── Screen navigation ──────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  const idx = ['home','league','stats'].indexOf(id);
+  if (idx >= 0) document.querySelectorAll('.nav-btn')[idx].classList.add('active');
+  if (id === 'stats') updateStatsScreen();
+}
+window.showScreen = showScreen;
+
+// ── UI update ──────────────────────────────────────────
+function updateUI() {
+  const s = STATE;
+  const cap = s.level * 100;
+  const pct = Math.min((s.xp % cap) / cap * 100, 100);
+  document.getElementById('xp-level').textContent = 'LVL ' + s.level;
+  document.getElementById('xp-fill').style.width = pct + '%';
+  document.getElementById('xp-label').textContent = (s.xp % cap) + '/' + cap;
+  document.getElementById('h-goals').textContent = s.goals;
+  const streakEl = document.getElementById('h-streak');
+  streakEl.textContent = s.streak > 0 ? '🔥' + s.streak : s.streak;
+  streakEl.style.color = s.streak > 2 ? 'var(--green)' : 'var(--white)';
+}
+
+function updateStatsScreen() {
+  const s = STATE;
+  const acc = (s.correct + s.wrong) > 0 ? Math.round(s.correct/(s.correct+s.wrong)*100) : 0;
+  document.getElementById('st-level').textContent = '⭐ ' + s.level;
+  document.getElementById('st-xp').textContent = '✨ ' + s.xp;
+  document.getElementById('st-goals').textContent = '⚽ ' + s.goals;
+  document.getElementById('st-acc').textContent = '🎯 ' + acc + '%';
+  document.getElementById('st-streak').textContent = '🔥 ' + s.bestStreak;
+  document.getElementById('st-total').textContent = '📝 ' + (s.correct + s.wrong);
+  const cap = s.level * 100;
+  const pct = Math.min((s.xp % cap) / cap * 100, 100);
+  document.getElementById('xp-level2').textContent = 'LVL ' + s.level;
+  document.getElementById('xp-fill2').style.width = pct + '%';
+  document.getElementById('xp-label2').textContent = (s.xp % cap) + '/' + cap;
+}
+
+// ── Topic selection ────────────────────────────────────
+window.selectTopic = function(id, emoji, name) {
+  currentTopic = { id, emoji, name };
+  document.getElementById('active-emoji').textContent = emoji;
+  document.getElementById('active-topic-name').textContent = name;
+  showScreen('training');
+  loadExercise();
+};
+
+// ── Load exercise ──────────────────────────────────────
+async function loadExercise() {
+  if (!currentTopic) return;
+  submitted = false;
+  hintVisible = false;
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('exercise-card').style.display = 'none';
+  document.getElementById('skip-btn').style.display = 'none';
+
+  try {
+    if (useAI && window.CLAUDE_API_KEY && !window.CLAUDE_API_KEY.startsWith('POSA')) {
+      currentExercise = await fetchFromClaude(currentTopic.id);
+    } else { throw new Error('no key'); }
+  } catch {
+    currentExercise = FALLBACK[fallbackIdx % FALLBACK.length];
+    fallbackIdx++;
+    if (useAI) useAI = false;
+  }
+
+  lastType = currentExercise.type;
+  renderExercise(currentExercise);
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('exercise-card').style.display = 'block';
+  document.getElementById('skip-btn').style.display = 'block';
+  document.getElementById('exercise-card').className = '';
+}
+window.loadExercise = loadExercise;
+
+// ── Render exercise ────────────────────────────────────
+function renderExercise(ex) {
+  document.getElementById('ex-context').textContent = ex.context;
+  document.getElementById('ex-question').textContent = ex.question;
+  document.getElementById('hint-box').textContent = ex.hint;
+  document.getElementById('hint-box').classList.remove('show');
+  document.getElementById('hint-toggle').textContent = '💡 Veure pista';
+  document.getElementById('feedback').className = '';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('submit-btn').disabled = true;
+
+  // Hide all input types
+  ['ex-fill','ex-translate','ex-reorder'].forEach(id => document.getElementById(id).style.display='none');
+
+  if (ex.type === 'fill') {
+    const grid = document.getElementById('ex-fill');
+    grid.style.display = 'grid';
+    grid.innerHTML = (ex.options || []).map(opt =>
+      `<button class="opt-btn" onclick="selectOption(this,'${opt}')">${opt}</button>`
+    ).join('');
+  } else if (ex.type === 'translate') {
+    const ta = document.getElementById('ex-translate');
+    ta.style.display = 'block';
+    ta.value = '';
+    ta.disabled = false;
+    ta.oninput = () => { document.getElementById('submit-btn').disabled = ta.value.trim().length < 3; };
+    document.getElementById('submit-btn').disabled = true;
+  } else if (ex.type === 'reorder') {
+    document.getElementById('ex-reorder').style.display = 'block';
+    orderedWords = [];
+    availableWords = [...(ex.words || [])].sort(() => Math.random() - 0.5);
+    renderReorder();
+  }
+}
+
+window.selectOption = function(btn, val) {
+  if (submitted) return;
+  document.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('submit-btn').disabled = false;
+};
+
+function renderReorder() {
+  const drop = document.getElementById('reorder-drop');
+  const bank = document.getElementById('reorder-bank');
+  const hint = document.getElementById('reorder-drop-hint');
+
+  if (orderedWords.length === 0) {
+    hint.style.display = 'inline';
+  } else {
+    hint.style.display = 'none';
+  }
+
+  drop.innerHTML = '';
+  if (orderedWords.length === 0) drop.appendChild(hint);
+  orderedWords.forEach((w, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'word-chip word-placed';
+    btn.textContent = w;
+    if (!submitted) btn.onclick = () => { availableWords.push(w); orderedWords.splice(i,1); renderReorder(); };
+    drop.appendChild(btn);
+  });
+
+  bank.innerHTML = '';
+  availableWords.forEach((w, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'word-chip word-avail';
+    btn.textContent = w;
+    if (!submitted) btn.onclick = () => { orderedWords.push(w); availableWords.splice(i,1); renderReorder(); };
+    bank.appendChild(btn);
+  });
+
+  const total = (currentExercise.words || []).length;
+  document.getElementById('submit-btn').disabled = orderedWords.length !== total;
+}
+
+// ── Submit answer ──────────────────────────────────────
+window.submitAnswer = function() {
+  if (submitted) return;
+  submitted = true;
+  const ex = currentExercise;
+  let userAns = '';
+
+  if (ex.type === 'fill') {
+    const sel = document.querySelector('.opt-btn.selected');
+    userAns = sel ? sel.textContent : '';
+  } else if (ex.type === 'translate') {
+    userAns = document.getElementById('ex-translate').value.trim();
+    document.getElementById('ex-translate').disabled = true;
+  } else if (ex.type === 'reorder') {
+    userAns = orderedWords.join(' ');
+  }
+
+  const normalize = s => s.toLowerCase().replace(/[.,!?'"]/g,'').trim();
+  const correct = normalize(userAns) === normalize(ex.answer);
+
+  document.getElementById('submit-btn').disabled = true;
+
+  if (ex.type === 'fill') {
+    document.querySelectorAll('.opt-btn').forEach(b => {
+      if (b.textContent === ex.answer) b.classList.add('correct-ans');
+      else if (b.classList.contains('selected')) b.classList.add('wrong-ans');
+      else b.classList.add('neutral-after');
+    });
+  }
+
+  const fb = document.getElementById('feedback');
+  const card = document.getElementById('exercise-card');
+
+  if (correct) {
+    fb.className = 'correct';
+    fb.textContent = '✅ Perfecte! Carregant...';
+    card.className = 'correct';
+    STATE.xp += 20;
+    STATE.goals++;
+    STATE.streak++;
+    STATE.correct++;
+    if (STATE.streak > STATE.bestStreak) STATE.bestStreak = STATE.streak;
+    STATE.level = Math.floor(STATE.xp / 100) + 1;
+    updateUI();
+    showGoal();
+    if (window.saveToFirebase) window.saveToFirebase();
+    setTimeout(loadExercise, 2400);
+  } else {
+    fb.className = 'wrong';
+    fb.textContent = '❌ Resposta: "' + ex.answer + '"';
+    card.className = 'wrong';
+    STATE.streak = 0;
+    STATE.wrong++;
+    STATE.xp = Math.max(0, STATE.xp - 5);
+    updateUI();
+    if (window.saveToFirebase) window.saveToFirebase();
+    setTimeout(loadExercise, 2400);
+  }
+};
+
+// ── Hint ───────────────────────────────────────────────
+window.toggleHint = function() {
+  hintVisible = !hintVisible;
+  document.getElementById('hint-box').classList.toggle('show', hintVisible);
+  document.getElementById('hint-toggle').textContent = hintVisible ? '💡 Amagar pista' : '💡 Veure pista';
+};
+
+// ── Goal celebration ───────────────────────────────────
+function showGoal() {
+  const ov = document.getElementById('goal-overlay');
+  ov.classList.add('show');
+  setTimeout(() => ov.classList.remove('show'), 2200);
+}
+
+// ── Claude API ─────────────────────────────────────────
+async function fetchFromClaude(topicId) {
+  const types = ["translate","fill","reorder"].filter(t => t !== lastType);
+  const type = types[Math.floor(Math.random() * types.length)];
+
+  const sys = `You are a fun English teacher for a 12-year-old Spanish-Catalan speaking boy who plays football for Atlètic Sant Just B (Sub-13B next season) in the FCF Catalan football federation.
+
+His team this season (Primera Divisió Aleví S12, Grup 9, 2025/26):
+- 5th place, 57pts (18W 3D 9L), 111 goals scored, 86 against
+- Last match: Won 9-8 vs Igualada CF A (thriller!)
+- League winner: UE Cornellà B (84pts)
+- Local rivals: Marc Bartra 2020, Escola F. Gavà, Viladecans UD, Cornellà UE SAD, Martorell CF
+- Ground: Camp Municipal de Sant Just Desvern
+
+Student level: B1 English (studying since age 3 at Kids & Us).
+Generate ONE English exercise about the topic given.
+Return ONLY valid JSON, no markdown:
+{
+  "type": "${type}",
+  "question": "...",
+  ${type==='fill'?'"options": ["a","b","c","d"],':''}
+  ${type==='reorder'?'"words": ["shuffled","words","here"],':''}
+  "answer": "...",
+  "hint": "Pista breu en català o castellà",
+  "context": "Escenari futbolístic emocionant amb emoji ⚽"
+}
+${type==='reorder'?'IMPORTANT: words array must be shuffled, not in sentence order!':''}`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': window.CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-client-side-allow-origins': window.location.origin || '*'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 800,
+      system: sys,
+      messages: [{ role: 'user', content: 'Topic: ' + topicId }]
+    })
+  });
+  const data = await res.json();
+  const text = (data.content || []).map(b => b.text || '').join('');
+  return JSON.parse(text.replace(/```json|```/g,'').trim());
+}
+
+</script>
+</body>
+</html>
